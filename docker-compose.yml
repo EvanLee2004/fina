@@ -1,0 +1,32 @@
+services:
+  postgres:
+    # 使用官方 PostgreSQL 15 镜像，满足你指定的数据库版本要求。
+    image: postgres:15
+    # 为容器指定固定名称，便于后续通过 docker ps / docker logs 快速定位。
+    container_name: fina-postgres
+    restart: unless-stopped
+    environment:
+      # 初始化数据库名称；首次创建数据目录时会自动生成该数据库。
+      POSTGRES_DB: fina
+      # 初始化数据库用户名。
+      POSTGRES_USER: fina
+      # 初始化数据库密码。
+      POSTGRES_PASSWORD: fina123
+    ports:
+      # 将容器内 PostgreSQL 默认端口映射到宿主机 5432，方便本机后端直接连接。
+      - "5432:5432"
+    volumes:
+      # 使用命名卷持久化 PostgreSQL 数据。
+      # 即使删除容器，只要不删除这个卷，数据库数据就会保留。
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # 使用 pg_isready 检查数据库是否已经可以接收连接。
+      test: ["CMD-SHELL", "pg_isready -U fina -d fina"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  # 定义命名卷，供上面的 postgres 服务复用，保证数据持久化。
+  postgres_data:
