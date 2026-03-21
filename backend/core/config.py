@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # 等接 AI 功能时再把真实 Key 填进去。
     DEEPSEEK_API_KEY: str = ""
 
+    # 后台管理访问令牌。
+    # 后续会用于校验请求头中的 X-Admin-Token 是否合法。
+    ADMIN_TOKEN: str
+
 
 # 创建一个全局单例。
 # 这样做的目的，是让整个项目都共享同一份配置对象，
