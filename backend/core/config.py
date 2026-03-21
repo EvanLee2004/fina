@@ -56,10 +56,19 @@ class Settings(BaseSettings):
     # 后续在登录、鉴权、中间件或安全模块里都会使用这个值。
     JWT_SECRET: str
 
-    # DeepSeek API Key。
-    # 当前允许为空字符串，方便你在本地先把系统跑起来，
-    # 等接 AI 功能时再把真实 Key 填进去。
-    DEEPSEEK_API_KEY: str = ""
+    # 通用 AI 服务访问密钥。
+    # 当前允许为空字符串，方便你先把系统跑起来，
+    # 真正调用模型时再手动填入对应服务商的 Key。
+    AI_API_KEY: str = ""
+
+    # OpenAI 兼容接口的基础地址。
+    # 默认指向 DeepSeek 的 OpenAI 兼容入口。
+    # 后续如需切换到其他兼容服务，只需要改这个值。
+    AI_BASE_URL: str = "https://api.deepseek.com/v1"
+
+    # 默认使用的模型名称。
+    # 当前默认使用 DeepSeek 的 deepseek-chat。
+    AI_MODEL: str = "deepseek-chat"
 
     # 后台管理访问令牌。
     # 后续会用于校验请求头中的 X-Admin-Token 是否合法。

@@ -2,7 +2,7 @@
 AI 服务层。
 
 这个文件专门负责：
-1. 调用 DeepSeek API 做自然语言记账解析。
+1. 调用 OpenAI 兼容格式的聊天补全接口做自然语言记账解析。
 2. 按月份汇总凭证数据并生成 AI 财务分析报告。
 3. 处理自然语言财务查询。
 """
@@ -24,22 +24,30 @@ from models.account import Account, AccountType
 from models.report import Report
 from models.voucher import Voucher, VoucherEntry, VoucherStatus
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
 
-
-def _call_deepseek(system_prompt: str, user_prompt: str) -> str:
+def _build_chat_completions_url() -> str:
     """
-    调用 DeepSeek 聊天补全接口。
+    生成 OpenAI 兼容聊天补全接口地址。
+
+    约定：
+    - settings.AI_BASE_URL 只保存基础前缀，例如 https://api.deepseek.com/v1
+    - 统一由这里补全 /chat/completions 路径
+    """
+    return f"{settings.AI_BASE_URL.rstrip('/')}/chat/completions"
+
+
+def _call_ai_chat_completion(system_prompt: str, user_prompt: str) -> str:
+    """
+    调用 OpenAI 兼容格式的聊天补全接口。
 
     返回值只取第一条消息内容，
     由上层函数决定如何解析成 JSON 或普通文本。
     """
-    if not settings.DEEPSEEK_API_KEY:
-        raise ValueError("DEEPSEEK_API_KEY 未配置。")
+    if not settings.AI_API_KEY:
+        raise ValueError("AI_API_KEY 未配置。")
 
     payload = {
-        "model": DEEPSEEK_MODEL,
+        "model": settings.AI_MODEL,
         "temperature": 0.2,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -49,9 +57,9 @@ def _call_deepseek(system_prompt: str, user_prompt: str) -> str:
 
     with httpx.Client(timeout=60.0) as client:
         response = client.post(
-            DEEPSEEK_API_URL,
+            _build_chat_completions_url(),
             headers={
-                "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                "Authorization": f"Bearer {settings.AI_API_KEY}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -62,7 +70,7 @@ def _call_deepseek(system_prompt: str, user_prompt: str) -> str:
     try:
         return response_data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("DeepSeek 返回结果格式异常。") from exc
+        raise ValueError("AI 接口返回结果格式异常。") from exc
 
 
 def _extract_json_object(content: str) -> dict[str, Any]:
@@ -220,7 +228,7 @@ def parse_natural_language(db: Session, text: str) -> dict[str, Any]:
 
     流程：
     1. 读取完整科目表
-    2. 组织 Prompt 调用 DeepSeek
+    2. 组织 Prompt 调用 OpenAI 兼容接口
     3. 解析并校验模型返回的严格 JSON
     4. 校验借贷平衡后返回草稿，不写入数据库
     """
@@ -262,7 +270,7 @@ def parse_natural_language(db: Session, text: str) -> dict[str, Any]:
 4. 只返回 JSON，不要任何其他文字
 """.strip()
 
-    content = _call_deepseek(system_prompt, user_prompt)
+    content = _call_ai_chat_completion(system_prompt, user_prompt)
     parsed = _extract_json_object(content)
 
     required_keys = {"date", "memo", "entries"}
@@ -282,7 +290,7 @@ def generate_report(db: Session, period: str) -> dict[str, Any]:
 
     流程：
     1. 汇总指定月份的收入、支出和净利润
-    2. 调用 DeepSeek 生成白话版中文分析
+    2. 调用 OpenAI 兼容接口生成白话版中文分析
     3. 把结果存入 reports 表
     4. 返回报告数据
     """
@@ -309,7 +317,7 @@ def generate_report(db: Session, period: str) -> dict[str, Any]:
 3. 简明说明收入、支出、利润情况，并给出一句经营判断
 """.strip()
 
-    content = _call_deepseek(system_prompt, user_prompt)
+    content = _call_ai_chat_completion(system_prompt, user_prompt)
 
     existing_report = db.scalar(select(Report).where(Report.period == period))
     if existing_report is None:
@@ -363,5 +371,5 @@ def query_financial_data(db: Session, text: str) -> dict[str, str]:
 请直接用中文回答用户问题。
 """.strip()
 
-    answer = _call_deepseek(system_prompt, user_prompt)
+    answer = _call_ai_chat_completion(system_prompt, user_prompt)
     return {"answer": answer, "period": period}

@@ -1,2 +1,5 @@
-.env
-.env
+# Python 缓存目录。
+__pycache__/
+
+# 本地虚拟环境目录。
+.venv/
