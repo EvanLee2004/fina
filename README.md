@@ -1,214 +1,192 @@
-# Fina — AI 财务管理后端
+# Fina 项目总结
 
-Fina 是 ohao 平台内部的财务管理后端服务，为 `ohao-admin` 和 AI Bot 提供统一的财务数据 API。
+## 项目背景
 
-## 当前状态
+Fina 是 ohao 平台的 AI 智能财务管理后端模块，服务于 ohao 团队内部财务管理需求。管理员通过 ohao-admin 看板操作，AI Bot 自动调用接口记录财务数据，普通用户可通过对话形式查询财务记录。
 
-- 已完成 PostgreSQL 连接与 Docker 数据库启动
-- 已完成核心数据表：科目、凭证、应收应付、报告
-- 已完成基础 Schema、Router、Service 分层
-- 已接入 `X-Admin-Token` 鉴权
-- 已接入 AI 能力：
-  - 自然语言转凭证草稿
-  - 财务分析报告生成
-  - 自然语言财务查询
+---
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 后端框架 | FastAPI |
-| Python | 3.11+ |
+| 后端框架 | FastAPI (Python 3.12) |
 | 数据库 | PostgreSQL 15 |
 | ORM | SQLAlchemy 2.0 |
 | 数据校验 | Pydantic v2 |
-| HTTP 客户端 | httpx |
+| AI 模型 | DeepSeek API |
 | 认证 | X-Admin-Token |
-| AI 模型 | 智谱 GLM-4.7-Flash |
-| 部署 | Docker + 本地 Uvicorn |
+| 部署 | Docker Compose |
 
-## 认证方式
-
-除以下路径外，所有接口都需要在请求头中携带：
-
-- `/ping`
-- `/docs`
-- `/openapi.json`
-
-请求头格式：
-
-```http
-X-Admin-Token: <token>
-```
-
-当前本地开发环境中，token 从 `.env` 的 `ADMIN_TOKEN` 读取。
+---
 
 ## 项目结构
 
 ```text
-backend/
-├── main.py
-├── core/
-│   ├── auth.py
-│   ├── config.py
-│   ├── database.py
-│   └── security.py
-├── models/
-│   ├── account.py
-│   ├── receivable.py
-│   ├── report.py
-│   └── voucher.py
-├── schemas/
-│   ├── account.py
-│   ├── ai.py
-│   ├── receivable.py
-│   ├── report.py
-│   └── voucher.py
-├── routers/
-│   ├── accounts.py
-│   ├── ai.py
-│   ├── receivables.py
-│   ├── reports.py
-│   └── vouchers.py
-├── scripts/
-│   └── init_accounts.py
-└── services/
-    ├── account_service.py
-    ├── ai_service.py
-    ├── receivable_service.py
-    ├── report_service.py
-    └── voucher_service.py
+fina/
+├── .env                          # 敏感配置（不进 Git）
+├── docker-compose.yml            # 一键启动 PostgreSQL
+├── README.md
+└── backend/
+    ├── main.py                   # FastAPI 入口，注册路由，启动建表
+    ├── requirements.txt          # Python 依赖
+    ├── core/
+    │   ├── config.py             # 读取 .env 环境变量
+    │   ├── database.py           # PostgreSQL 连接，Session 管理
+    │   ├── security.py           # JWT 工具（备用）
+    │   └── auth.py               # X-Admin-Token 验证依赖
+    ├── models/                   # SQLAlchemy 数据库表定义
+    │   ├── account.py            # 会计科目表
+    │   ├── voucher.py            # 凭证表 + 凭证分录表
+    │   ├── receivable.py         # 应收应付表
+    │   └── report.py             # AI 报告存档表
+    ├── schemas/                  # Pydantic 请求/响应结构
+    │   ├── account.py
+    │   ├── voucher.py
+    │   ├── ai.py
+    │   ├── receivable.py
+    │   └── report.py
+    ├── routers/                  # API 路由层
+    │   ├── accounts.py
+    │   ├── vouchers.py
+    │   ├── ai.py
+    │   ├── reports.py
+    │   └── receivables.py
+    ├── services/                 # 业务逻辑层
+    │   ├── account_service.py
+    │   ├── voucher_service.py
+    │   ├── ai_service.py
+    │   ├── receivable_service.py
+    │   └── report_service.py
+    └── scripts/
+        └── init_accounts.py      # 初始化标准会计科目
 ```
 
-## 已实现接口
+---
 
-所有业务接口统一挂在 `/api/admin` 前缀下。
+## 数据库设计
+
+共 5 张表：
+
+| 表名 | 说明 |
+|---|---|
+| accounts | 会计科目表，含18条标准科目 |
+| vouchers | 凭证主表 |
+| voucher_entries | 凭证分录表（一对多） |
+| receivables | 应收应付表 |
+| reports | AI 财务分析报告存档 |
+
+---
+
+## API 接口总览
+
+所有接口前缀：`/api/admin/`  
+认证方式：请求头 `X-Admin-Token: <token>`
 
 ### 科目管理
 
-- `GET /api/admin/accounts`
-- `GET /api/admin/accounts/tree`
-- `POST /api/admin/accounts`
-- `PATCH /api/admin/accounts/{account_id}`
-- `DELETE /api/admin/accounts/{account_id}`
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| GET | /api/admin/accounts/ | 获取科目列表 |
+| GET | /api/admin/accounts/tree | 获取科目树 |
+| POST | /api/admin/accounts/ | 新增科目 |
+| PATCH | /api/admin/accounts/{id} | 更新科目 |
+| DELETE | /api/admin/accounts/{id} | 软删除科目 |
 
 ### 凭证管理
 
-- `GET /api/admin/vouchers`
-- `GET /api/admin/vouchers/{voucher_id}`
-- `POST /api/admin/vouchers`
-- `PATCH /api/admin/vouchers/{voucher_id}/approve`
-- `DELETE /api/admin/vouchers/{voucher_id}`
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| GET | /api/admin/vouchers/ | 凭证列表（支持日期筛选） |
+| GET | /api/admin/vouchers/{id} | 获取单条凭证 |
+| POST | /api/admin/vouchers/ | 新增凭证（含借贷平衡校验） |
+| PATCH | /api/admin/vouchers/{id}/approve | 审核凭证 |
+| DELETE | /api/admin/vouchers/{id} | 删除草稿凭证 |
 
 ### AI 接口
 
-- `POST /api/admin/ai/parse`
-- `POST /api/admin/ai/report`
-- `POST /api/admin/ai/query`
-
-### 报表
-
-- `GET /api/admin/reports`
-- `GET /api/admin/reports/{period}`
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| POST | /api/admin/ai/parse | 自然语言 → 凭证草稿 |
+| POST | /api/admin/ai/report | 生成 AI 财务分析报告 |
+| POST | /api/admin/ai/query | 自然语言查询财务数据 |
 
 ### 应收应付
 
-- `GET /api/admin/receivables`
-- `POST /api/admin/receivables`
-- `PATCH /api/admin/receivables/{receivable_id}/settle`
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| GET | /api/admin/receivables/ | 列表（支持类型和状态筛选） |
+| POST | /api/admin/receivables/ | 新增记录 |
+| PATCH | /api/admin/receivables/{id}/settle | 标记已结清 |
+
+### 报表
+
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| GET | /api/admin/reports/ | 报告列表 |
+| GET | /api/admin/reports/{period} | 获取指定月份报告 |
+
+---
+
+## 核心功能说明
+
+### 自然语言记账
+
+用户输入"今天付了3000块房租"，系统自动：
+
+1. 查出所有会计科目，注入 Prompt
+2. 调用 DeepSeek API 解析意图
+3. 返回结构化凭证草稿（含借贷科目和金额）
+4. 校验借贷平衡
+5. 用户确认后调凭证接口入库
+
+### 借贷平衡校验
+
+创建凭证时强制校验：借方总额 = 贷方总额，不平衡返回 400 错误。已审核凭证不可删除、不可重复审核。
+
+### AI 财务分析报告
+
+指定月份后，系统自动：
+
+1. 汇总该月已审核凭证数据
+2. 计算总收入、总支出、净利润
+3. 调 DeepSeek 生成白话版分析报告
+4. 存入 reports 表备查
+
+---
 
 ## 快速启动
 
-### 1. 启动 PostgreSQL
-
 ```bash
+# 1. 启动数据库
 docker compose up -d
-```
 
-### 2. 安装后端依赖
-
-```bash
+# 2. 激活虚拟环境
 source .venv/bin/activate
+
+# 3. 安装依赖
 pip install -r backend/requirements.txt
-```
 
-### 3. 启动后端服务
+# 4. 初始化标准科目
+python backend/scripts/init_accounts.py
 
-```bash
+# 5. 启动服务
 cd backend
 uvicorn main:app --reload
 ```
 
-启动后默认访问：
+访问：
 
-- 接口文档：`http://127.0.0.1:8000/docs`
-- 健康检查：`http://127.0.0.1:8000/ping`
+- 接口文档：http://localhost:8000/docs
+- 健康检查：http://localhost:8000/ping
 
-## 环境变量
+---
 
-项目当前使用的核心环境变量：
+## 待对接事项
 
-```env
-DATABASE_URL=postgresql://fina:fina123@localhost:5432/fina
-DEEPSEEK_API_KEY=your_api_key
-ADMIN_TOKEN=your_admin_token
-```
+- [ ] 和 ohao-admin 确认 ADMIN_TOKEN 的值，写入 Cloudflare 环境变量
+- [ ] 部署到 Railway（和 MoGen3D、Fluxa 同一平台）
+- [ ] 在 ohao-admin 的 projects.ts 里注册 Fina 模块
+- [ ] AI query 接口根据实际使用场景调整 Prompt
 
-说明：
-
-- `DEEPSEEK_API_KEY` 这个字段名目前保留不变，但实际用于调用智谱 GLM 接口
-- `JWT_SECRET` 目前仍保留在配置中，但当前架构下不参与主认证流程
-
-## 初始化标准会计科目
-
-项目内置了标准会计科目初始化脚本，会自动跳过已存在科目：
-
-```bash
-python backend/scripts/init_accounts.py
-```
-
-会插入以下常用科目：
-
-- 资产类：库存现金、银行存款、应收账款、预付账款、库存商品
-- 负债类：应付账款、应付职工薪酬、应交税费、预收账款
-- 所有者权益类：实收资本、资本公积、本年利润
-- 收入类：主营业务收入、其他业务收入
-- 成本类：主营业务成本
-- 费用类：销售费用、管理费用、财务费用
-
-## AI 接口示例
-
-### 生成财务分析报告
-
-请求：
-
-```bash
-curl -X POST "http://127.0.0.1:8000/api/admin/ai/report" \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Token: your_admin_token" \
-  -d '{"period":"2026-03"}'
-```
-
-### 自然语言转凭证草稿
-
-请求：
-
-```bash
-curl -X POST "http://127.0.0.1:8000/api/admin/ai/parse" \
-  -H "Content-Type: application/json" \
-  -H "X-Admin-Token: your_admin_token" \
-  -d '{"text":"支付3月份办公室房租3000元，银行转账"}'
-```
-
-## 当前限制
-
-- AI 生成的凭证草稿目前只做解析和借贷校验，不自动入库
-- 凭证创建时 `created_by` 仍使用占位值，后续需要接入外部管理员身份
-- `reports` 相关接口已可查询，但完整报表域模型和更多报表类型还未扩展
-
-## 下一步建议
-
-- 接入真实管理员身份解析，替换 `created_by` 占位值
-- 为 AI 查询补更细的语义解析和更多统计口径
-- 为新增、修改、审核接口补测试
-- 增加 Alembic 管理数据库迁移
+---
