@@ -1,5 +1,15 @@
 # Python 缓存目录。
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # 本地虚拟环境目录。
 .venv/
+
+# macOS Finder 元数据文件。
+.DS_Store
+
+# 导出产物属于运行时文件，不应进入版本库。
+exports/*
+!exports/.gitkeep

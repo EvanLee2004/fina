@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from core.auth import verify_token
 from core.database import get_db
 from schemas.voucher import VoucherCreate, VoucherResponse
-from services import voucher_service
+from services.accounting import voucher_service
 
 # 创建凭证路由。
 # 所有接口统一走管理员令牌校验。

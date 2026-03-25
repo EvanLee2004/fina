@@ -14,7 +14,7 @@ from core.auth import verify_token
 from core.database import get_db
 from models.receivable import ReceivableStatus, ReceivableType
 from schemas.receivable import ReceivableCreate, ReceivableResponse
-from services import receivable_service
+from services.accounting import receivable_service
 
 # 创建应收应付路由。
 # 所有接口统一要求管理员令牌。

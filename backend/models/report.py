@@ -54,6 +54,14 @@ class Report(Base):
         comment="AI 生成的报告文字内容",
     )
 
+    # 客观财务数据快照。
+    # 这里保存报告生成当下的结构化汇总 JSON，便于 Excel/Word 导出复用。
+    objective_json: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="客观财务数据快照 JSON",
+    )
+
     # 报告创建时间。
     # 默认记录当前 UTC 时间，便于后续按生成时间排序与追踪。
     created_at: Mapped[datetime] = mapped_column(
@@ -61,4 +69,12 @@ class Report(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         comment="报告创建时间",
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        comment="报告更新时间",
     )

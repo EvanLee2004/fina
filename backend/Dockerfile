@@ -4,6 +4,12 @@ FROM python:3.12-slim
 # 这样后续可以直接使用 uvicorn main:app 启动服务。
 WORKDIR /app/backend
 
+# 安装 matplotlib 绘图和中文字体所需的系统依赖。
+# fonts-noto-cjk 用于保证容器内生成的中文图表不会出现乱码或方块字。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
 # 先复制依赖文件，便于利用 Docker 构建缓存。
 COPY backend/requirements.txt ./requirements.txt
 

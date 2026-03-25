@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from core.auth import verify_token
 from core.database import get_db
 from schemas.account import AccountCreate, AccountResponse, AccountTree
-from services import account_service
+from services.accounting import account_service
 
 # 创建会计科目路由。
 # 统一挂在 /api/admin/accounts 前缀下，并对所有接口应用管理员令牌校验。

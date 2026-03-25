@@ -26,6 +26,9 @@ class NLInput(BaseModel):
     # 用户输入的自然语言文本。
     text: str = Field(..., description="用户输入的自然语言文本")
 
+    # 可选模型名；不传时走后端默认模型。
+    model: str | None = Field(None, description="可选模型名，例如 deepseek-chat 或 gpt-4o-mini")
+
 
 class VoucherDraftEntry(BaseModel):
     """
@@ -60,6 +63,18 @@ class VoucherDraft(BaseModel):
     # AI 解析出的分录列表。
     entries: list[VoucherDraftEntry] = Field(default_factory=list, description="分录列表")
 
+    # 置信度。
+    confidence: float = Field(default=0.0, description="模型对本次记账草稿的置信度，范围 0 到 1")
+
+    # 是否需要人工确认。
+    needs_confirmation: bool = Field(default=True, description="是否必须人工确认后才能继续")
+
+    # 草稿成立所依赖的假设。
+    assumptions: list[str] = Field(default_factory=list, description="生成草稿时用到的假设")
+
+    # 风险提示或口径警告。
+    warnings: list[str] = Field(default_factory=list, description="需要提醒用户关注的风险点")
+
 
 class QueryInput(BaseModel):
     """
@@ -70,6 +85,9 @@ class QueryInput(BaseModel):
 
     # 用户查询文本。
     text: str = Field(..., description="用户查询的自然语言文本")
+
+    # 可选模型名；用于生成查询解释时覆盖默认模型。
+    model: str | None = Field(None, description="本次查询使用的模型名")
 
 
 class ReportRequest(BaseModel):
@@ -82,3 +100,6 @@ class ReportRequest(BaseModel):
     # 报告月份。
     # 按你的要求使用 YYYY-MM 格式，例如 2024-03。
     period: str = Field(..., pattern=r"^\d{4}-\d{2}$", description="报告月份，格式 2024-03")
+
+    # 可选模型名；只影响报告中的 AI 分析部分。
+    model: str | None = Field(None, description="生成报告分析时使用的模型名")
